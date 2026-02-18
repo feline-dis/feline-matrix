@@ -2,7 +2,7 @@ ohana-matrix.xyz {
 	handle /.well-known/matrix/client {
 		header Content-Type application/json
 		header Access-Control-Allow-Origin *
-		respond `{"m.homeserver":{"base_url":"https://ohana-matrix.xyz"},"org.matrix.msc4143.rtc_foci":[{"type":"livekit","livekit_service_url":"https://ohana-matrix.xyz/sfu/get"}]}`
+		respond `{"m.homeserver":{"base_url":"https://ohana-matrix.xyz"},"org.matrix.msc4143.rtc_foci":[{"type":"livekit","livekit_service_url":"https://ohana-matrix.xyz/livekit/jwt"}]}`
 	}
 
 	handle /.well-known/matrix/server {
@@ -10,11 +10,11 @@ ohana-matrix.xyz {
 		respond `{"m.server":"ohana-matrix.xyz:8448"}`
 	}
 
-	handle /sfu/get* {
+	handle_path /livekit/jwt* {
 		reverse_proxy lk-jwt-service:8080
 	}
 
-	handle_path /sfu* {
+	handle_path /livekit/sfu* {
 		reverse_proxy livekit:7880
 	}
 
