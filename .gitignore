@@ -2,3 +2,5 @@
 data/
 config/matrix_key.pem
 *.log
+
+.claude/*.local.*

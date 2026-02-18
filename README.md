@@ -1,159 +1,126 @@
 # feline-matrix
 
-A Dendrite Matrix homeserver deployed on Fly.io.
+Self-hosted Matrix homeserver with invite-gated registration and Element Call voice/video support.
+
+Runs [Tuwunel](https://github.com/matrix-construct/tuwunel) (a Rust Matrix homeserver) on a Hetzner VPS behind Caddy, with a custom Go reverse proxy that adds invite-code-gated user registration.
 
 ## Architecture
 
 ```
-Internet (clients)           Internet (federation)
-       |                            |
-  port 443 (HTTPS)             port 8448 (TLS)
-  Fly Proxy                    Fly Proxy
-       |                            |
-  +----|-----------------------------|----+
-  |    |         Fly Machine         |    |
-  |    |                             |    |
-  |    +--- dendrite :8008 (client)  |    |
-  |         dendrite :8448 (federation)   |
-  |              |                        |
-  +--------------|-----------+------------+
-                 |           |
-          Railway Postgres   Fly Volume
-          (external DB)      /data (media, jetstream, search)
+Internet
+  |
+  Caddy (:80, :443, :8448)
+    |
+    +-- /.well-known/matrix/*      -> static JSON (served by Caddy)
+    +-- /livekit/jwt*              -> lk-jwt-service:8080  (LiveKit JWT auth)
+    +-- /livekit/sfu*              -> livekit:7880          (WebSocket)
+    +-- /*                         -> registration-proxy:8008
+                                        +-- /register/*    -> embedded static UI
+                                        +-- /api/register  -> invite-gated handler
+                                        +-- /*             -> tuwunel:6167
+    |
+    +-- :8448 /*                   -> tuwunel:6167          (federation)
+
+  LiveKit host ports:
+    7881/tcp              (ICE TCP fallback)
+    50000-50200/udp       (WebRTC media)
 ```
 
-A single Fly Machine runs the Dendrite monolith. Fly's proxy terminates TLS on both ports. PostgreSQL is hosted externally on Railway. Media, JetStream, and search index data persist on a Fly volume.
+**Caddy** -- TLS termination and routing for all traffic, including federation on port 8448.
 
-## Project structure
+**Tuwunel** -- Rust Matrix homeserver using RocksDB for storage. No external database needed.
 
-```
-.
-├── config/
-│   ├── dendrite.yaml        # Dendrite configuration
-│   └── matrix_key.pem       # Signing key (generated, gitignored)
-├── scripts/
-│   ├── generate-keys.sh     # Generate matrix_key.pem via Docker
-│   ├── create-account.sh    # Create user accounts on Fly
-│   └── fly-entrypoint.sh    # Fly runtime: injects secrets, remaps paths
-├── Dockerfile               # Fly build: dendrite image with config baked in
-├── fly.toml                 # Fly app configuration (gitignored)
-└── .env.example             # Environment variable template
-```
+**Registration proxy** (`registration/main.go`) -- Go binary (stdlib only, zero dependencies). Serves the registration UI, validates invite codes via Matrix UIA (`m.login.registration_token`), and reverse-proxies everything else to Tuwunel.
 
-### Key files
+**LiveKit** -- WebRTC media server powering Element Call voice/video.
 
-**`config/dendrite.yaml`** -- The Dendrite configuration file. For Fly, the entrypoint script patches it at boot to inject the database URI and remap data paths.
+**lk-jwt-service** -- Issues JWT tokens so Matrix clients can authenticate with LiveKit.
 
-**`Dockerfile`** -- Builds on the official `dendrite-monolith` image. Copies in the config, signing key, and entrypoint script. Overrides the default entrypoint so secrets can be injected before Dendrite starts.
-
-**`fly.toml`** -- Defines the Fly app. Exposes the client API on port 443 (HTTPS, health-checked against `/_matrix/client/versions`) and federation on port 8448 (TCP with TLS). Mounts a persistent volume at `/data`. Gitignored because it contains the app-specific name.
-
-**`scripts/fly-entrypoint.sh`** -- Runs at container start on Fly. Replaces the `connection_string` in dendrite.yaml with the `DATABASE_URI` secret, remaps data paths to `/data/*`, creates data directories, then execs into the Dendrite binary.
-
-**`scripts/create-account.sh`** -- Creates Matrix user accounts on the Fly deployment via SSH.
-
-## Deploy to Fly.io
+## Self-hosting
 
 ### Prerequisites
 
-- [flyctl](https://fly.io/docs/flyctl/install/) installed and authenticated
-- A PostgreSQL database (e.g., Railway) with the connection URI ready
+- Docker and Docker Compose
+- A domain with DNS pointing to your server
+- Port 443 (HTTPS) and 8448 (federation) open
 
-### Steps
+### Setup
 
-1. **Create the Fly app and volume:**
-
-   ```sh
-   fly apps create <app-name>
-   fly volumes create dendrite_data --region <region> --size 1
-   ```
-
-2. **Update `fly.toml`:**
-
-   Set the `app` field to your app name and `primary_region` to your chosen region.
-
-3. **Generate the signing key:**
+1. Clone the repo and configure secrets:
 
    ```sh
-   bash scripts/generate-keys.sh
+   git clone https://github.com/felinedis/feline-matrix.git
+   cd feline-matrix
+   cp .env.example .env
+   # Edit .env -- set INVITE_CODE, LIVEKIT_KEY, LIVEKIT_SECRET
    ```
 
-4. **Configure `dendrite.yaml`:**
+2. Update configuration files with your domain:
+   - `Caddyfile` -- replace `ohana-matrix.xyz` with your domain
+   - `config/conduwuit.toml` -- set `server_name` to your domain
+   - `docker-compose.yml` -- update `LIVEKIT_URL` and `LIVEKIT_FULL_ACCESS_HOMESERVERS` in the `lk-jwt-service` section
 
-   Edit `config/dendrite.yaml` and set `server_name` to your domain (e.g., `matrix.yourdomain.com`). If your server name differs from the hostname clients connect to, uncomment and set `well_known_server_name`.
-
-5. **Set secrets:**
+3. Generate LiveKit API keys (if you don't have them):
 
    ```sh
-   fly secrets set DATABASE_URI="postgres://user:pass@host:port/dbname"
+   docker run --rm livekit/generate-keys
    ```
 
-6. **Deploy:**
+4. Deploy:
 
    ```sh
-   fly deploy
+   docker compose up -d --build
    ```
 
-7. **Set up DNS:**
+5. Set up DNS:
+   - A record for your domain pointing to your server's IP
+   - Port 8448 must be reachable for federation (Caddy handles TLS)
 
-   ```sh
-   fly ips list
-   ```
+6. Verify federation: https://federationtester.matrix.org
 
-   Create A and AAAA records for your domain pointing to the IPs shown. Use **DNS-only mode** (not proxied) -- Cloudflare's proxy does not support port 8448.
+## Joining the server
 
-8. **Create an admin account:**
+1. **Get an invite code** from the server admin.
+2. **Register** at `https://<domain>/register/` -- enter a username, password, and the invite code.
+3. **Download a Matrix client:**
+   - [Element Web](https://app.element.io)
+   - [Element Desktop](https://element.io/download)
+   - [Element Mobile](https://element.io/download) (iOS / Android)
+4. **Sign in** with your Matrix ID (`@username:<domain>`) and set the homeserver URL to `https://<domain>`.
+5. **Voice/video calls** work out of the box via Element Call (built into Element clients).
 
-   ```sh
-   bash scripts/create-account.sh -username admin -admin
-   ```
+## Project structure
 
-### Verification
+| File | Description |
+|---|---|
+| `registration/main.go` | Go reverse proxy with invite-gated registration (single file, stdlib only) |
+| `registration/www/` | Static HTML/CSS/JS for the registration UI (embedded into the Go binary) |
+| `docker-compose.yml` | Full stack: Caddy, Tuwunel, registration proxy, LiveKit, lk-jwt-service |
+| `Caddyfile` | Reverse proxy routing and TLS termination |
+| `config/conduwuit.toml` | Tuwunel homeserver configuration |
+| `livekit/livekit.yaml` | LiveKit server configuration |
+| `Dockerfile` | Two-stage build for the Go registration proxy |
+| `.env.example` | Template for required environment variables |
 
-- Check the machine is running: `fly status`
-- Test the client API: `curl https://<app-name>.fly.dev/_matrix/client/versions`
-- Test federation: https://federationtester.matrix.org
+## Development
 
-## Management
-
-### Creating user accounts
+### Build the Go proxy locally
 
 ```sh
-bash scripts/create-account.sh -username alice
-
-# Admin account
-bash scripts/create-account.sh -username admin -admin
+cd registration && go build -o registration-proxy .
 ```
 
-### Redeploying after config changes
-
-Edit `config/dendrite.yaml` locally, then redeploy:
+### Run the full stack
 
 ```sh
-fly deploy
+cp .env.example .env   # fill in values
+docker compose up -d --build
 ```
 
-The config is baked into the Docker image at build time. The entrypoint script patches it with secrets at runtime.
+### Deploy
 
-### Checking logs
+Push to `master` triggers automatic deployment via GitHub Actions. Manual deploy:
 
 ```sh
-fly logs
+git pull && docker compose up -d --build
 ```
-
-### SSH into the machine
-
-```sh
-fly ssh console
-```
-
-### Secrets
-
-Secrets are managed via `fly secrets` and injected by the entrypoint script at boot:
-
-```sh
-fly secrets set DATABASE_URI="postgres://..."
-fly secrets list
-```
-
-Changing a secret triggers a redeployment automatically.
