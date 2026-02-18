@@ -41,7 +41,9 @@ services:
 
   livekit:
     image: livekit/livekit-server:latest
-    command: --config /etc/livekit.yaml --keys "${LIVEKIT_KEY}: ${LIVEKIT_SECRET}"
+    command: --config /etc/livekit.yaml
+    environment:
+      - "LIVEKIT_KEYS=${LIVEKIT_KEY}: ${LIVEKIT_SECRET}"
     ports:
       - "7881:7881/tcp"
       - "50000-50200:50000-50200/udp"
