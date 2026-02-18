@@ -21,6 +21,6 @@ if [ ! -f /data/matrix_key.pem ]; then
     /usr/bin/generate-keys -private-key /data/matrix_key.pem
 fi
 
-mkdir -p /data/media /data/jetstream /data/searchindex
+mkdir -p /data/media /data/searchindex
 
 exec /usr/bin/dendrite --config "$runtime_config" --http-bind-address :8008
