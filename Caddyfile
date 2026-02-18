@@ -14,7 +14,7 @@ ohana-matrix.xyz {
 		reverse_proxy lk-jwt-service:8080
 	}
 
-	handle /sfu* {
+	handle_path /sfu* {
 		reverse_proxy livekit:7880
 	}
 
