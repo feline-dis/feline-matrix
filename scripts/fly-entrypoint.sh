@@ -17,4 +17,10 @@ sed -i 's|/var/dendrite/searchindex|/data/searchindex|' "$config"
 
 mkdir -p /data/media /data/jetstream /data/searchindex
 
+# Generate signing key on the persistent volume if it doesn't exist
+if [ ! -f /data/matrix_key.pem ]; then
+    /usr/bin/generate-keys -private-key /data/matrix_key.pem
+fi
+sed -i 's|private_key:.*|private_key: /data/matrix_key.pem|' "$config"
+
 exec /usr/bin/dendrite --config "$config"
