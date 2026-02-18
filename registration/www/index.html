@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Register - ohana-matrix.xyz</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <main>
+        <h1>Create Account</h1>
+        <p class="subtitle">ohana-matrix.xyz</p>
+
+        <form id="register-form">
+            <label for="username">Username</label>
+            <div class="input-hint">@<span id="username-preview">username</span>:ohana-matrix.xyz</div>
+            <input type="text" id="username" name="username" required autocomplete="username"
+                   pattern="[a-z0-9._=\-/]+" placeholder="username">
+
+            <label for="password">Password</label>
+            <input type="password" id="password" name="password" required autocomplete="new-password"
+                   minlength="8" placeholder="at least 8 characters">
+
+            <label for="invite-code">Invite Code</label>
+            <input type="text" id="invite-code" name="invite_code" required autocomplete="off"
+                   placeholder="enter invite code">
+
+            <button type="submit">Register</button>
+        </form>
+
+        <div id="message" hidden></div>
+    </main>
+    <script src="register.js"></script>
+</body>
+</html>

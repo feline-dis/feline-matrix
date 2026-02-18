@@ -31,7 +31,7 @@ global:
 
 client_api:
   registration_disabled: true
-  # registration_shared_secret: ""
+  registration_shared_secret: "REGISTRATION_SHARED_SECRET_PLACEHOLDER"
 
 federation_api:
   send_max_retries: 16

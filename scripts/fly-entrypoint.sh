@@ -10,6 +10,11 @@ if [ -n "${DATABASE_URI:-}" ]; then
     sed -i "s|connection_string:.*|connection_string: ${escaped_uri}|" "$config"
 fi
 
+# Inject registration shared secret
+if [ -n "${REGISTRATION_SHARED_SECRET:-}" ]; then
+    sed -i "s|REGISTRATION_SHARED_SECRET_PLACEHOLDER|${REGISTRATION_SHARED_SECRET}|" "$config"
+fi
+
 # Remap data paths to the Fly volume mount
 sed -i 's|/var/dendrite/jetstream|/data/jetstream|' "$config"
 sed -i 's|/var/dendrite/media|/data/media|' "$config"
@@ -23,4 +28,12 @@ if [ ! -f /data/matrix_key.pem ]; then
 fi
 sed -i 's|private_key:.*|private_key: /data/matrix_key.pem|' "$config"
 
-exec /usr/bin/dendrite --config "$config"
+# Start Dendrite in the background on port 8009 (client API).
+# The registration proxy listens on 8008 and forwards to 8009.
+# Federation stays on 8448 (handled directly by fly.toml TCP service).
+/usr/bin/dendrite --config "$config" \
+    --http-bind-address :8009 \
+    --https-bind-address :8448 &
+
+# Start the registration proxy in the foreground
+exec /usr/local/bin/registration-proxy
