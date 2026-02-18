@@ -1,20 +1,8 @@
-# Dendrite Configuration
-#
-# Before starting:
-#   1. Replace "matrix.example.com" with your actual domain
-#   2. Ensure the database connection string matches your .env values
-#   3. Generate matrix_key.pem with: bash scripts/generate-keys.sh
-
 version: 2
 
 global:
   server_name: ohana-matrix.xyz
-  private_key: matrix_key.pem
-
-  # Serve .well-known/matrix/server so federating servers can discover this host.
-  # Set this to your domain with the federation port if your server_name
-  # differs from the hostname clients/servers connect to.
-  # well_known_server_name: "matrix.example.com:8448"
+  private_key: /data/matrix_key.pem
 
   database:
     connection_string: postgres://dendrite:changeme@postgres/dendrite?sslmode=disable
@@ -27,7 +15,7 @@ global:
     max_age: 1h
 
   jetstream:
-    storage_path: /var/dendrite/jetstream
+    storage_path: /data/jetstream
 
 client_api:
   registration_disabled: true
@@ -38,14 +26,14 @@ federation_api:
   disable_tls_validation: false
 
 media_api:
-  base_path: /var/dendrite/media
+  base_path: /data/media
   max_file_size_bytes: 10485760
   dynamic_thumbnails: false
 
 sync_api:
   search:
     enabled: true
-    index_path: /var/dendrite/searchindex
+    index_path: /data/searchindex
 
 logging:
   - type: std

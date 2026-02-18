@@ -1,4 +1,4 @@
-name: Deploy to Fly.io
+name: Deploy to VPS
 
 on:
   push:
@@ -8,10 +8,13 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-
-      - uses: superfly/flyctl-actions/setup-flyctl@master
-
-      - run: flyctl deploy --remote-only
-        env:
-          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.HETZNER_SSH_PRIVATE_KEY }}
+          script: |
+            cd ~/feline-matrix
+            git pull origin master
+            docker compose up -d --build --remove-orphans

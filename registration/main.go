@@ -34,7 +34,14 @@ func main() {
 		log.Fatal("INVITE_CODE is not set")
 	}
 
-	dendriteURL, _ := url.Parse("http://localhost:8009")
+	dendriteAddr := os.Getenv("DENDRITE_URL")
+	if dendriteAddr == "" {
+		dendriteAddr = "http://localhost:8009"
+	}
+	dendriteURL, err := url.Parse(dendriteAddr)
+	if err != nil {
+		log.Fatalf("invalid DENDRITE_URL %q: %v", dendriteAddr, err)
+	}
 	proxy := httputil.NewSingleHostReverseProxy(dendriteURL)
 
 	wwwFS, err := fs.Sub(staticFiles, "www")

@@ -1,0 +1,28 @@
+ohana-matrix.xyz {
+	handle /.well-known/matrix/client {
+		header Content-Type application/json
+		header Access-Control-Allow-Origin *
+		respond `{"m.homeserver":{"base_url":"https://ohana-matrix.xyz"},"org.matrix.msc4143.rtc_foci":[{"type":"livekit","livekit_service_url":"https://ohana-matrix.xyz/sfu/get"}]}`
+	}
+
+	handle /.well-known/matrix/server {
+		header Content-Type application/json
+		respond `{"m.server":"ohana-matrix.xyz:8448"}`
+	}
+
+	handle /sfu/get* {
+		reverse_proxy lk-jwt-service:8080
+	}
+
+	handle /sfu* {
+		reverse_proxy livekit:7880
+	}
+
+	handle {
+		reverse_proxy registration-proxy:8008
+	}
+}
+
+ohana-matrix.xyz:8448 {
+	reverse_proxy dendrite:8008
+}
