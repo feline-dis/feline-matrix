@@ -34,7 +34,7 @@ Internet
 - **Registration proxy** (`registration/main.go`): Go binary using only stdlib. Serves the registration UI, validates invite codes via Matrix UIA (m.login.registration_token), and reverse-proxies all other traffic to Conduwuit.
 - **LiveKit** handles WebRTC media for Element Call voice/video.
 - **lk-jwt-service** issues JWT tokens for LiveKit access, scoped to `ohana-matrix.xyz`.
-- **Matrix Claude Bot** (`@claude:ohana-matrix.xyz`): standalone Go binary from [feline-dis/matrix-claude-bot](https://github.com/feline-dis/matrix-claude-bot). Responds to @-mentions via the Anthropic Claude API. Runs as a systemd service (`matrix-claude-bot.service`) outside the Docker stack. Binary at `/opt/matrix-claude-bot/matrix-claude-bot`, config at `/opt/matrix-claude-bot/config.yaml`.
+- **Matrix Claude Bot** (`@claude:ohana-matrix.xyz`): standalone Go binary from [feline-dis/matrix-claude-bot](https://github.com/feline-dis/matrix-claude-bot). Responds to @-mentions via the Anthropic Claude API. Supports E2EE via mautrix cryptohelper (opt-in `crypto` section in config). Has tool use capabilities: web search (Anthropic built-in), sandboxed filesystem (read/write/list in `/opt/matrix-claude-bot/sandbox`), and MCP server integration. Runs as a systemd service (`matrix-claude-bot.service`) outside the Docker stack. Binary at `/opt/matrix-claude-bot/matrix-claude-bot`, config at `/opt/matrix-claude-bot/config.yaml`, crypto state in `matrix-claude-bot.db`.
 - Static registration UI files (`registration/www/`) are embedded into the Go binary via `//go:embed`.
 
 ## Build and Development
